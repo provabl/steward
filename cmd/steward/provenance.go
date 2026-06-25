@@ -4,11 +4,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/provabl/steward/internal/provenance"
 	"github.com/provabl/steward/internal/store"
 )
 
@@ -20,9 +25,78 @@ func provenanceCmd() *cobra.Command {
 		Use:   "provenance",
 		Short: "Record and verify data-ingestion provenance",
 		Long: `Record the provenance of data brought into a secure account (move-to-compute),
-and (later) verify the recorded digest against the bytes at the destination.`,
+and verify the recorded digest against the bytes at the destination.`,
 	}
-	cmd.AddCommand(provenanceRecordCmd())
+	cmd.AddCommand(provenanceRecordCmd(), provenanceVerifyCmd())
+	return cmd
+}
+
+// fileReader is the production ObjectReader for local-path destinations. S3 (and
+// other movers' schemes) are deferred to the AWS slice; today verify works
+// against a local mount of the destination, which is enough to make the
+// "recomputed and matched" claim real and fully testable.
+type fileReader struct{}
+
+func (fileReader) Open(_ context.Context, dest string) (io.ReadCloser, error) {
+	path := strings.TrimPrefix(dest, "file://")
+	if strings.Contains(path, "://") {
+		return nil, fmt.Errorf("verify supports local paths only in v1; %q needs a mover-specific reader (deferred)", dest)
+	}
+	return os.Open(path) //nolint:gosec // operator-supplied path to data they govern
+}
+
+func provenanceVerifyCmd() *cobra.Command {
+	var (
+		dest       string
+		stewardDir string
+	)
+	cmd := &cobra.Command{
+		Use:   "verify",
+		Short: "Recompute the recorded digest against the bytes at the destination",
+		Long: `Recompute the sha256 of the bytes at a recorded destination and compare it to
+the digest captured at 'provenance record' time. On a match, the record is
+flipped to integrity_verified=true — which is what makes steward's provenance
+claim mean "steward recomputed and matched," not "a mover told us." On a
+mismatch the record is left unverified and verify exits non-zero.
+
+v1 verifies local-path (or file://) destinations; S3 and other mover schemes are
+deferred to the AWS slice.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if dest == "" {
+				return fmt.Errorf("--dest is required")
+			}
+			s := store.New(stewardDir)
+			rec, err := s.LoadRecord(dest)
+			if err != nil {
+				return err
+			}
+			if rec == nil {
+				return fmt.Errorf("no provenance record for %s — run 'steward provenance record' first", dest)
+			}
+			res, err := provenance.Verify(context.Background(), fileReader{}, dest, rec.Digest)
+			if err != nil {
+				return err
+			}
+			if !res.Matched {
+				fmt.Printf("✗ Digest mismatch for %s\n", dest)
+				fmt.Printf("  recorded: %s\n", res.RecordedDigest)
+				fmt.Printf("  computed: %s\n", res.ComputedDigest)
+				fmt.Println("  integrity_verified: false — the bytes at the destination do not match the recorded digest")
+				return fmt.Errorf("integrity verification failed")
+			}
+			rec.IntegrityVerified = true
+			if err := s.SaveRecord(rec); err != nil {
+				return err
+			}
+			fmt.Printf("✓ Verified %s\n", rec.Dataset)
+			fmt.Printf("  digest: %s\n", res.ComputedDigest)
+			fmt.Println("  integrity_verified: true")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&dest, "dest", "", "destination to verify, matching a recorded provenance dest (required)")
+	cmd.Flags().StringVar(&stewardDir, "steward-dir", ".steward", "store directory")
+	_ = cmd.MarkFlagRequired("dest")
 	return cmd
 }
 
