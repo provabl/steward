@@ -76,6 +76,10 @@ steward gate --dest s3://sre-genomic/dbgap/phs000178/ --dua-required
 
 # 4. Audit trail: what came in, from where, under what DUA, and whether it's verified.
 steward log --data-class GENOMIC
+
+# Preflight (optional, for the AWS-touching paths): confirm the calling principal
+# holds the IAM actions steward needs. Read-only — it evaluates, it never acts.
+steward preflight --region us-west-2
 ```
 
 > **v1 verify scope:** `verify` recomputes against local / `file://` destinations (e.g. a mounted
@@ -95,9 +99,12 @@ go install github.com/provabl/steward/cmd/steward@latest   # requires Go 1.26.4+
 
 ## Status
 
-🚧 **Under active development** — v1 (provenance record/verify, the `data://` appraisal gate, log,
-preflight) is being built. Transport (the mover), S3 Object Lock handling, and closeout/destruction
-are deferred follow-ons. See `business/steward-product-spec.md` (in the umbrella) and provabl ADR 0004.
+**v1 complete** — provenance `record`/`verify`, the `data://` appraisal `gate` (→ `.steward/gate-result.json`
+/ `context.data.*`), `log`, and `preflight` all ship. The `mover` (transport) and `handling` (data-class
+tag + Object Lock retention) **interface seams** are defined; their live impls — `steward ingest` (drive
+a mover) and `apply-handling` (S3 Object Lock) — plus closeout/destruction are deferred follow-ons
+(retention/destruction are high-consequence and need live AWS). See `business/steward-product-spec.md`
+(in the umbrella) and provabl ADR 0004 for the full roadmap.
 
 ## License
 

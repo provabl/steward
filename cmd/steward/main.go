@@ -44,7 +44,6 @@ context.data.*. Where vet qualifies the software, steward qualifies the data.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	cmd.AddCommand(provenanceCmd(), gateCmd(), logCmd())
-	// Further subcommands are added in their own PRs: preflight.
+	cmd.AddCommand(provenanceCmd(), gateCmd(), logCmd(), preflightCmd())
 	return cmd
 }
