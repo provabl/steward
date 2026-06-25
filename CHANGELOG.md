@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`internal/store` + `steward provenance record`** (v1 PR2): the `.steward/` store and the first
+  command. `ProvenanceRecord` captures what data was ingested, from where, its digest, the governing
+  DUA, and the authorizing principal; `GateResult` is the lowered `context.data.*` shape attest will
+  read (PR4). Records are keyed by destination (re-recording a dest supersedes). `record` writes an
+  *asserted* digest with `integrity_verified=false` — only `provenance verify` (PR5) recomputes it
+  against the destination and flips it, so the provenance claim means "steward recomputed and matched,"
+  not "someone told us." Fully unit-tested (round-trip, missing→nil, overwrite-by-dest, list, CLI).
+
 - **Initial repo scaffold** — `steward`, the Provabl suite's data-ingestion stewardship tool
   (move-to-compute governance; the counterpart to the compute-to-data chain). Go 1.26.4,
   Apache-2.0 / Playground Logic LLC, cobra CLI root. Where vet qualifies the software that arrives
