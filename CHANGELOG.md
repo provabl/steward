@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward gate` + `internal/gate`** (v1 PR4): evaluates an ingested destination's provenance
+  record through the evidence kernel and writes `.steward/gate-result.json` (the `context.data.*`
+  attributes attest's Cedar PDP reads). Runs the canonical `Seq(Nonce, Seq(Meas, Sig))` term, appraises,
+  and lowers — judgment lives in the `data://` pair, not the gate. **Fail-closed**: a destination with
+  no provenance record, or one whose digest is unverified, does not pass (and still writes a
+  fail-closed result so pipelines get the artifact). Policy flags `--dua-required` (default on),
+  `--require-data-class`, `--allowed-sources`. Added `data.Dataset` to the claim set so the dataset id
+  flows to the PDP. New `docs/integrations/attest.md` documents the `context.data.*` contract +
+  reader-ownership (consumer lives in attest). Unit-tested (pass / unverified / missing-record /
+  wrong-class) + a record→gate end-to-end check.
+
 - **`internal/evidence` — the `data://` (ASP, appraiser) pair** (v1 PR3): steward's provider for the
   provabl/evidence kernel, the data-plane analogue of vet's `artifact://` pair. The measurer fetches a
   provenance record (fail-closed `CollectFailed` when none); the appraiser emits the `context.data.*`

@@ -158,6 +158,7 @@ func TestClaimKeysGolden(t *testing.T) {
 		got[c.Key] = true
 	}
 	want := []string{
+		stewardasp.ClaimDataset,
 		stewardasp.ClaimProvenanceVerified,
 		stewardasp.ClaimSourceVerified,
 		stewardasp.ClaimIntegrityChecked,
@@ -173,6 +174,7 @@ func TestClaimKeysGolden(t *testing.T) {
 	}
 	// Pin the exact string values too — these are the wire contract.
 	expect := map[string]string{
+		stewardasp.ClaimDataset:            "data.Dataset",
 		stewardasp.ClaimProvenanceVerified: "data.ProvenanceVerified",
 		stewardasp.ClaimSourceVerified:     "data.SourceVerified",
 		stewardasp.ClaimIntegrityChecked:   "data.IntegrityChecked",

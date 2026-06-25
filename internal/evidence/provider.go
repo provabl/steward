@@ -97,6 +97,7 @@ func (m measurer) Measure(ctx context.Context, in asp.MeasureIn) (ev.Measurement
 // attest's Cedar PDP reads from gate-result.json (context.data.*); they are pinned
 // by a golden test so they cannot silently drift.
 const (
+	ClaimDataset            = "data.Dataset"            // the dataset/study id (e.g. phs000178)
 	ClaimProvenanceVerified = "data.ProvenanceVerified" // steward recomputed the digest and it matched
 	ClaimSourceVerified     = "data.SourceVerified"     // the source URI is on the allowed list
 	ClaimIntegrityChecked   = "data.IntegrityChecked"   // an integrity re-check was performed
@@ -122,6 +123,7 @@ func (appraiser) Appraise(_ context.Context, in asp.AppraiseIn) (asp.Verdict, er
 	// Posture claims — always emitted, regardless of pass/fail, so a policy can
 	// read the data posture even on a denial.
 	claims := []asp.Claim{
+		{Key: ClaimDataset, Value: rec.Dataset, Type: "string"},
 		{Key: ClaimProvenanceVerified, Value: boolStr(rec.IntegrityVerified), Type: "bool"},
 		{Key: ClaimSourceVerified, Value: boolStr(sourceVerified), Type: "bool"},
 		{Key: ClaimIntegrityChecked, Value: boolStr(rec.IntegrityVerified), Type: "bool"},

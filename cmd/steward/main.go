@@ -40,7 +40,7 @@ kernel, and writes the .steward/gate-result.json attest's Cedar PDP reads as
 context.data.*. Where vet qualifies the software, steward qualifies the data.`,
 		Version: version,
 	}
-	cmd.AddCommand(provenanceCmd())
-	// Further subcommands are added in their own PRs: gate, log, preflight.
+	cmd.AddCommand(provenanceCmd(), gateCmd())
+	// Further subcommands are added in their own PRs: log, preflight.
 	return cmd
 }
