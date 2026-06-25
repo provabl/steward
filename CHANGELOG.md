@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`internal/evidence` — the `data://` (ASP, appraiser) pair** (v1 PR3): steward's provider for the
+  provabl/evidence kernel, the data-plane analogue of vet's `artifact://` pair. The measurer fetches a
+  provenance record (fail-closed `CollectFailed` when none); the appraiser emits the `context.data.*`
+  claim contract (`ProvenanceVerified`, `SourceVerified`, `IntegrityChecked`, `DUAId`, `DataClass`,
+  `SubjectDigest`, `RecordedAt`) and applies param-driven judgment — crucially, an **unverified digest
+  cannot pass** (`integrity_verified=false` → fail), enforcing "recomputed and matched, not asserted."
+  `EphemeralAM` (per-run ed25519 key; freshness rides the kernel's outer SIG). Tested through the real
+  CVM across pass/unverified/missing-DUA/wrong-class/source-allowlist/missing-record paths, plus a
+  **golden test pinning the `context.data.*` claim keys** so the attest contract can't silently drift.
+
 - **`internal/store` + `steward provenance record`** (v1 PR2): the `.steward/` store and the first
   command. `ProvenanceRecord` captures what data was ingested, from where, its digest, the governing
   DUA, and the authorizing principal; `GateResult` is the lowered `context.data.*` shape attest will
