@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward preflight` + the deferred `mover` / `handling` interface seams** (v1 PR6, completes v1):
+  `steward preflight` verifies the calling principal holds steward's AWS-touching IAM actions
+  (`s3:GetObject` for verifying an S3 destination's digest; `s3:PutObjectTagging` /
+  `s3:PutObjectRetention` for the deferred apply-handling path) via read-only
+  `iam:SimulatePrincipalPolicy` against the caller — it evaluates, it never acts; a denied action
+  prints a remediation and exits non-zero. **Fail-closed** (a credential/simulator failure is an error
+  result, not a silent pass); cloned from vet's mockable STS/IAM check and fully fake-tested. Added
+  `internal/mover.Mover` (pluggable transport seam — Globus / DataSync / s3cp; "the mover is pluggable,
+  the governance is the product") and `internal/handling.Tagger` (data-class tag + Object Lock
+  retention seam), **interfaces only — no live impls**: v1 governs out-of-band-moved data, and applying
+  retention is high-consequence + CI-untestable, so `steward ingest` / `apply-handling` are deferred
+  follow-ons that plug into these contracts. New `docs/required-permissions.md` maps each action to its
+  command and live/deferred status.
+
 - **`steward provenance verify` + `steward log`** (v1 PR5): `provenance verify` recomputes the
   sha256 of the bytes at a recorded destination and compares it to the digest captured at `record`
   time; on a match it flips the record to `integrity_verified=true` — which is what makes steward's
