@@ -16,7 +16,7 @@ Part of the [Provabl](https://provabl.dev) suite:
 - **[vet](https://vet.provabl.dev)** — verify the software supply chain
 - **steward** — govern data brought into the boundary ← you are here
 
-> Ground your infrastructure, attest your controls, qualify your people, vet your software.
+> Ground your infrastructure, attest your controls, qualify your people, vet your software, steward your data.
 
 ---
 
