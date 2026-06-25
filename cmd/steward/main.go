@@ -39,8 +39,12 @@ data brought into a secure account, appraises it through the provabl/evidence
 kernel, and writes the .steward/gate-result.json attest's Cedar PDP reads as
 context.data.*. Where vet qualifies the software, steward qualifies the data.`,
 		Version: version,
+		// main() prints the error and sets the exit code; don't double-print or
+		// dump usage on a runtime (RunE) failure.
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
-	cmd.AddCommand(provenanceCmd(), gateCmd())
-	// Further subcommands are added in their own PRs: log, preflight.
+	cmd.AddCommand(provenanceCmd(), gateCmd(), logCmd())
+	// Further subcommands are added in their own PRs: preflight.
 	return cmd
 }

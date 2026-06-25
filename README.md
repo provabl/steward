@@ -51,6 +51,37 @@ provenance record, and (later) handling/retention and closeout.
 - **`data://` [(ASP, appraiser) pair](https://github.com/provabl/provabl/blob/main/docs/guide/glossary.md#asp-attestation-service-provider)** — steward registers one against the [evidence kernel](https://github.com/provabl/provabl/blob/main/docs/guide/glossary.md#evidence-kernel), so the provenance is *appraised and fresh*, not a bare assertion.
 - **[Lowered attribute](https://github.com/provabl/provabl/blob/main/docs/guide/glossary.md#lowered-attribute)** — the verdict becomes `.steward/gate-result.json` (→ `context.data.*`); attest reads it. **attest stays the [PDP](https://github.com/provabl/provabl/blob/main/docs/guide/glossary.md#pdp-policy-decision-point); steward never decides.**
 
+## Usage
+
+The move-to-compute lifecycle: **record** what came in, **verify** the bytes are intact, **gate** the
+destination (writing the attribute attest reads), and **log** the audit trail.
+
+```bash
+# 1. Record provenance for data that landed in the SRE (asserted digest).
+steward provenance record \
+    --dataset phs000178 \
+    --dest s3://sre-genomic/dbgap/phs000178/ \
+    --source globus:dtn.ncbi.nlm.nih.gov/dbgap/phs000178 \
+    --digest sha256:8e1ebe… --dua-id DUA-2025-001 --data-class GENOMIC \
+    --authorized-by compliance@mru.edu
+
+# 2. Verify: recompute the digest against the destination bytes.
+#    On a match this flips integrity_verified=true — the provenance claim now
+#    means "steward recomputed and matched," not "a mover told us." Mismatch → exit 1.
+steward provenance verify --dest s3://sre-genomic/dbgap/phs000178/
+
+# 3. Gate: appraise through the evidence kernel, write .steward/gate-result.json
+#    (context.data.*). An unverified digest fails closed; exits non-zero if policy isn't met.
+steward gate --dest s3://sre-genomic/dbgap/phs000178/ --dua-required
+
+# 4. Audit trail: what came in, from where, under what DUA, and whether it's verified.
+steward log --data-class GENOMIC
+```
+
+> **v1 verify scope:** `verify` recomputes against local / `file://` destinations (e.g. a mounted
+> copy of the landing zone). S3 and other mover-specific schemes are deferred to the AWS slice; the
+> recompute logic itself is transport-agnostic (an injected reader), so adding S3 is a wiring change.
+
 ## Install
 
 ```bash

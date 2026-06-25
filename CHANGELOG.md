@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward provenance verify` + `steward log`** (v1 PR5): `provenance verify` recomputes the
+  sha256 of the bytes at a recorded destination and compares it to the digest captured at `record`
+  time; on a match it flips the record to `integrity_verified=true` — which is what makes steward's
+  provenance claim mean "steward recomputed and matched," not "a mover told us." On a mismatch the
+  record is left unverified and verify exits non-zero (tamper is detectable). The destination read
+  is behind an injected `internal/provenance.ObjectReader`, so the recompute logic is fully fake-
+  testable; the CLI's production reader handles local / `file://` paths, with S3 and other mover
+  schemes deferred to the AWS slice. `steward log` (over `internal/audit`) lists the ingestion audit
+  trail — dataset, source, DUA, data class, and verified-state, newest first — filterable by
+  `--data-class` / `--dua-id`, with `--json`. End-to-end smoke: gate *fails* on an asserted-only
+  digest, `verify` flips it, gate then *passes*; a tampered file fails verify.
+
 - **`steward gate` + `internal/gate`** (v1 PR4): evaluates an ingested destination's provenance
   record through the evidence kernel and writes `.steward/gate-result.json` (the `context.data.*`
   attributes attest's Cedar PDP reads). Runs the canonical `Seq(Nonce, Seq(Meas, Sig))` term, appraises,
