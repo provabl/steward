@@ -19,6 +19,7 @@ func ingestCmd() *cobra.Command {
 		duaID, dataClass, principal  string
 		allowedDUAs, allowedSources  []string
 		requireDataClass, stewardDir string
+		authorizer, region           string
 	)
 	cmd := &cobra.Command{
 		Use:   "ingest",
@@ -32,11 +33,15 @@ unauthorized request never moves bytes, a failed move never writes a record, and
 the recorded digest is the mover's *asserted* value (integrity_verified=false)
 until 'steward provenance verify' recomputes it against the destination.
 
-v1 authorization is config-driven (--allowed-dua / --allowed-source /
---require-data-class) and the only mover is the local reference mover (local
-paths / file://). The IAM-tag authorizer (reading attest:nih-dua-ids) and the
-live movers (Globus / DataSync / s3cp) are deferred — same seam, no code change
-to this command.
+Authorization (--authorizer):
+  policy  the config-driven authorizer (default): --allowed-dua / --allowed-source
+          / --require-data-class. Deny-by-default; no AWS.
+  iam     reads the principal's real attest:nih-dua-ids IAM role tag (the set
+          qualify writes on approval) and permits only if it contains --dua-id.
+          --allowed-source / --require-data-class still apply. Needs iam:ListRoleTags.
+
+The only mover today is the local reference mover (local paths / file://); the
+live movers (Globus / DataSync / s3cp) are deferred behind the same seam.
 
 Example:
   steward ingest --dataset phs000178 \
@@ -48,10 +53,22 @@ Example:
 			if dataset == "" || source == "" || dest == "" {
 				return fmt.Errorf("--dataset, --source, and --dest are required")
 			}
-			auth := ingest.PolicyAuthorizer{
-				AllowedDUAs:      allowedDUAs,
-				AllowedSources:   allowedSources,
-				RequireDataClass: requireDataClass,
+			var auth ingest.Authorizer
+			switch authorizer {
+			case "policy", "":
+				auth = ingest.PolicyAuthorizer{
+					AllowedDUAs:      allowedDUAs,
+					AllowedSources:   allowedSources,
+					RequireDataClass: requireDataClass,
+				}
+			case "iam":
+				a, err := ingest.NewIAMAuthorizer(cmd.Context(), region, allowedSources, requireDataClass)
+				if err != nil {
+					return err
+				}
+				auth = a
+			default:
+				return fmt.Errorf("unknown --authorizer %q (want: policy, iam)", authorizer)
 			}
 			ing := ingest.New(auth, mover.NewLocalMover(), store.New(stewardDir))
 			res, err := ing.Ingest(cmd.Context(), ingest.Request{
@@ -81,6 +98,8 @@ Example:
 	cmd.Flags().StringSliceVar(&allowedDUAs, "allowed-dua", nil, "a DUA id the principal is approved for (repeatable)")
 	cmd.Flags().StringSliceVar(&allowedSources, "allowed-source", nil, "an allowed source prefix (repeatable)")
 	cmd.Flags().StringVar(&requireDataClass, "require-data-class", "", "require the request's data class to match this")
+	cmd.Flags().StringVar(&authorizer, "authorizer", "policy", "authorization source: policy (config-driven, default) or iam (reads attest:nih-dua-ids)")
+	cmd.Flags().StringVar(&region, "region", "us-east-1", "AWS region (for --authorizer iam)")
 	cmd.Flags().StringVar(&stewardDir, "steward-dir", ".steward", "store directory")
 	return cmd
 }

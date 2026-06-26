@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`ingest --authorizer iam` — authorize against real IAM tags** (post-v1): the production
+  `ingest.Authorizer` that reads the requesting principal's `attest:nih-dua-ids` IAM role tag (the set
+  qualify writes on approval, the same one the compute-to-data chain checks) and permits an ingestion
+  only if it contains the request's `--dua-id`. `--allowed-source` / `--require-data-class` still apply.
+  steward is a **reader** here — it never writes `attest:*` tags. Fail-closed: an unreadable role, or a
+  non-role principal ARN, is an error, not a silent decision. `ingest --authorizer` selects `policy`
+  (config-driven, default, no AWS) or `iam`; the `Ingester` is unchanged (both satisfy the same
+  interface). Fully fake-tested (held / not-held / no-tag / source+class still enforced / unreadable
+  fails closed / non-role errors; ARN→role-name and the delimited-set parser). `preflight` and
+  `docs/required-permissions.md` updated for `iam:ListRoleTags` + the now-shipped apply-handling /
+  closeout S3 actions.
+
 - **`steward closeout` + `internal/closeout`** (post-v1, spec §5): the lifecycle bookend — destroy a
   dataset at DUA closeout and emit an auditable destruction certificate. steward's highest-consequence
   operation (it DELETES controlled data), so it is **"certify + confirm, never silent delete"** (ADR
