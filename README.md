@@ -83,7 +83,16 @@ steward provenance verify --dest s3://sre-genomic/dbgap/phs000178/
 #    (context.data.*). An unverified digest fails closed; exits non-zero if policy isn't met.
 steward gate --dest s3://sre-genomic/dbgap/phs000178/ --dua-required
 
-# 4. Audit trail: what came in, from where, under what DUA, and whether it's verified.
+# 4. Handle: tag the destination with its data class + apply Object Lock retention
+#    for the DUA term. Strengthen-only — shortening/removing a lock is refused.
+steward apply-handling s3://sre-genomic/dbgap/phs000178/ --data-class GENOMIC --retain-until 2027-05-01
+
+# 5. Closeout (at DUA end): destroy + emit a certificate. Dry run by default;
+#    --confirm --principal to actually destroy, and only after retention elapses.
+steward closeout s3://sre-genomic/dbgap/phs000178/ --dua-id DUA-2025-001          # dry run
+steward closeout s3://sre-genomic/dbgap/phs000178/ --dua-id DUA-2025-001 --confirm --principal arn:aws:iam::…:role/Compliance
+
+# Audit trail: what came in, from where, under what DUA, and whether it's verified.
 steward log --data-class GENOMIC
 
 # Preflight (optional, for the AWS-touching paths): confirm the calling principal
@@ -108,15 +117,16 @@ go install github.com/provabl/steward/cmd/steward@latest   # requires Go 1.26.4+
 
 ## Status
 
-**v1 complete; `ingest` + `apply-handling` shipped.** Provenance `record`/`verify`, the `data://`
-appraisal `gate` (→ `.steward/gate-result.json` / `context.data.*`), `log`, and `preflight` ship.
-**`steward ingest`** drives authorize → move → record over the `mover` seam (config-driven authorizer +
-local reference mover — full lifecycle runs with no AWS). **`steward apply-handling`** tags an ingested
-S3 destination with its data class and applies S3 Object Lock retention for the DUA term, enforcing
-"handling may be strengthened but never relaxed" (live-validated against real S3 + Object Lock).
-Deferred behind their seams: the live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer;
-closeout/destruction (high-consequence, certify-and-confirm). See `business/steward-product-spec.md`
-(in the umbrella) and provabl ADR 0004 for the full roadmap.
+**The full move-to-compute lifecycle ships:** `ingest` → `provenance verify` → `gate` →
+`apply-handling` → `closeout`, plus `log` and `preflight`. **`ingest`** drives authorize → move →
+record over the `mover` seam (config-driven authorizer + local reference mover — runs with no AWS).
+**`apply-handling`** tags an S3 destination with its data class and applies Object Lock retention for
+the DUA term, "strengthened but never relaxed." **`closeout`** destroys data at DUA end and emits a
+destruction certificate — *certify + confirm, never silent delete*: a dry run by default, refusing
+until any Object Lock retention has elapsed and requiring an explicit confirming principal
+(both apply-handling and closeout live-validated against real S3 + Object Lock). Deferred behind their
+seams: the live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer. See
+`business/steward-product-spec.md` (in the umbrella) and provabl ADR 0004 for the full roadmap.
 
 ## License
 

@@ -9,12 +9,13 @@
 // Where vet qualifies the software that arrives at an SRE, steward qualifies the
 // data. See the suite spec (business/steward-product-spec.md) and ADR 0004.
 //
-// Commands: ingest (authorize → move → record), provenance record/verify, the
-// data:// appraisal gate, apply-handling (data-class tag + S3 Object Lock
-// retention), audit log, and preflight. The live movers (Globus / DataSync /
-// s3cp), the IAM-tag authorizer, and closeout/destruction are deferred behind
-// their seams; ingest's v1 uses a config-driven authorizer + a local reference
-// mover, so the move→verify→gate lifecycle runs without AWS.
+// Commands span the full move-to-compute lifecycle: ingest (authorize → move →
+// record), provenance record/verify, the data:// appraisal gate, apply-handling
+// (data-class tag + S3 Object Lock retention), closeout (certify + confirm
+// destruction at DUA end), audit log, and preflight. The live movers (Globus /
+// DataSync / s3cp) and the IAM-tag authorizer are deferred behind their seams;
+// ingest's v1 uses a config-driven authorizer + a local reference mover, so the
+// move→verify→gate lifecycle runs without AWS.
 package main
 
 import (
@@ -47,6 +48,6 @@ context.data.*. Where vet qualifies the software, steward qualifies the data.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	cmd.AddCommand(ingestCmd(), provenanceCmd(), gateCmd(), applyHandlingCmd(), logCmd(), preflightCmd())
+	cmd.AddCommand(ingestCmd(), provenanceCmd(), gateCmd(), applyHandlingCmd(), closeoutCmd(), logCmd(), preflightCmd())
 	return cmd
 }
