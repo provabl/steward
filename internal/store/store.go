@@ -58,6 +58,24 @@ type GateResult struct {
 	EvaluatedAt        time.Time `json:"evaluated_at"`
 }
 
+// DestructionCertificate is the auditable record `steward closeout` emits when a
+// dataset is destroyed at DUA closeout. It is the evidence an auditor asks for:
+// what was destroyed, under which DUA, when, by whom, that the retention term had
+// elapsed first, and the digest of what was destroyed (the provenance record's
+// verified digest, so the certificate ties back to exactly the bytes that were
+// governed). Written to .steward/certificates/<key>.json.
+type DestructionCertificate struct {
+	Dataset          string    `json:"dataset"`
+	Dest             string    `json:"dest"`
+	DUAID            string    `json:"dua_id"`
+	DataClass        string    `json:"data_class,omitempty"`
+	Digest           string    `json:"digest,omitempty"`         // the destroyed data's recorded digest
+	RetainedUntil    time.Time `json:"retained_until,omitempty"` // the elapsed retention term verified before destruction
+	ObjectsDestroyed int       `json:"objects_destroyed"`
+	DestroyedBy      string    `json:"destroyed_by"` // the confirming principal
+	DestroyedAt      time.Time `json:"destroyed_at"`
+}
+
 // Store manages the .steward/ directory.
 type Store struct {
 	dir string
@@ -150,6 +168,38 @@ func (s *Store) SaveGateResult(g *GateResult) error {
 		return fmt.Errorf("marshal gate result: %w", err)
 	}
 	return os.WriteFile(filepath.Join(s.dir, "gate-result.json"), data, 0o640)
+}
+
+// SaveCertificate writes a DestructionCertificate to
+// .steward/certificates/<key>.json, keyed by destination (one current
+// certificate per destroyed prefix; the audit log is the full history).
+func (s *Store) SaveCertificate(c *DestructionCertificate) error {
+	dir := filepath.Join(s.dir, "certificates")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return fmt.Errorf("create .steward/certificates: %w", err)
+	}
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal certificate: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, recordKey(c.Dest)+".json"), data, 0o640)
+}
+
+// LoadCertificate reads the destruction certificate for a destination, or nil if
+// none exists (the data was not destroyed via steward).
+func (s *Store) LoadCertificate(dest string) (*DestructionCertificate, error) {
+	data, err := os.ReadFile(filepath.Join(s.dir, "certificates", recordKey(dest)+".json"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read certificate: %w", err)
+	}
+	var c DestructionCertificate
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, fmt.Errorf("parse certificate: %w", err)
+	}
+	return &c, nil
 }
 
 // Dir returns the root .steward/ directory path.

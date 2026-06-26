@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward closeout` + `internal/closeout`** (post-v1, spec §5): the lifecycle bookend — destroy a
+  dataset at DUA closeout and emit an auditable destruction certificate. steward's highest-consequence
+  operation (it DELETES controlled data), so it is **"certify + confirm, never silent delete"** (ADR
+  0004): a **dry run by default** (reports what would be destroyed, deletes nothing), with `--confirm`
+  + `--principal` required to actually destroy. The `Closer` enforces three gates fail-closed *before*
+  any deletion: (1) a provenance record must exist (only close out governed data; DUA must match when
+  given), (2) any S3 Object Lock retention must have **fully elapsed** — destroying mid-term would
+  itself violate the DUA, and the *earliest* retention across the prefix gates the whole thing, (3) the
+  destruction must be explicitly confirmed by a named principal. On success it deletes every object
+  version + delete-marker and writes a `DestructionCertificate` (dataset, DUA, data class, the
+  destroyed digest, the elapsed `retained_until`, object count, principal, timestamp). The `Destroyer`
+  is a seam (live S3 impl + fakes). Fully fake-tested incl. every refusal path (dry-run-destroys-
+  nothing, retention-not-elapsed, confirm-without-principal, no-record, DUA-mismatch, state-unreadable-
+  fails-closed, just-elapsed-boundary). **Live-validated against real S3 + Object Lock**, then torn
+  down clean: refusal during active retention, dry-run-leaves-data, confirmed destroy → empty bucket +
+  certificate. This completes the move-to-compute lifecycle (ingest → verify → gate → handling →
+  closeout).
+
 - **`steward apply-handling` + the `handling` Applier/Backend** (post-v1, spec §3): applies a data
   class's storage controls to an ingested S3 destination — the `steward:data-class` object tag and,
   with `--retain-until`, S3 Object Lock (COMPLIANCE mode) retention aligned to the DUA term. The
