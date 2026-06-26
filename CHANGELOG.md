@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward ingest` + `internal/ingest`** (post-v1, spec §1): the authorized move-to-compute flow —
+  **authorize → move → record**, fail-closed at every step. `internal/ingest.Ingester` composes an
+  `Authorizer`, the `mover.Mover` seam (its first consumer — shipped interface-only in v1), and the
+  store: an unauthorized request never moves bytes, a failed move never writes a record, and the
+  recorded digest is the mover's *asserted* value (`integrity_verified=false`) until
+  `steward provenance verify` recomputes it. v1 of the flow ships a config-driven `PolicyAuthorizer`
+  (`--allowed-dua` / `--allowed-source` / `--require-data-class`, deny-by-default) and a `LocalMover`
+  reference transport (local paths / `file://`, computing the sha256 as it copies) — so the whole
+  `ingest → verify → gate` lifecycle runs with no AWS. The IAM-tag authorizer (reading
+  `attest:nih-dua-ids`) and the live movers (Globus / DataSync / s3cp) are deferred behind the same
+  seams — no change to this command when they land. Fully fake-tested (authorize-then-move ordering,
+  denial-never-moves, mover-error-never-records, fail-closed authorizer) + a local-mover round-trip
+  and a CLI end-to-end.
+
 - **`steward preflight` + the deferred `mover` / `handling` interface seams** (v1 PR6, completes v1):
   `steward preflight` verifies the calling principal holds steward's AWS-touching IAM actions
   (`s3:GetObject` for verifying an S3 destination's digest; `s3:PutObjectTagging` /

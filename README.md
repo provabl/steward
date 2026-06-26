@@ -53,11 +53,20 @@ provenance record, and (later) handling/retention and closeout.
 
 ## Usage
 
-The move-to-compute lifecycle: **record** what came in, **verify** the bytes are intact, **gate** the
-destination (writing the attribute attest reads), and **log** the audit trail.
+The move-to-compute lifecycle: **ingest** data under authorization (or **record** what landed
+out-of-band), **verify** the bytes are intact, **gate** the destination (writing the attribute attest
+reads), and **log** the audit trail.
 
 ```bash
-# 1. Record provenance for data that landed in the SRE (asserted digest).
+# 1a. Ingest: authorize → move → record, in one governed step. The ingestion is
+#     checked BEFORE any bytes move; a failed authorization moves nothing.
+steward ingest \
+    --dataset phs000178 --source ./incoming/phs000178.tar --dest ./sre/genomic/phs000178.tar \
+    --dua-id DUA-2025-001 --data-class GENOMIC \
+    --principal arn:aws:iam::123456789012:role/AliceResearchRole \
+    --allowed-dua DUA-2025-001 --allowed-source ./incoming/ --require-data-class GENOMIC
+
+# 1b. …or, for data moved out-of-band, just record its provenance (asserted digest).
 steward provenance record \
     --dataset phs000178 \
     --dest s3://sre-genomic/dbgap/phs000178/ \
@@ -99,12 +108,14 @@ go install github.com/provabl/steward/cmd/steward@latest   # requires Go 1.26.4+
 
 ## Status
 
-**v1 complete** — provenance `record`/`verify`, the `data://` appraisal `gate` (→ `.steward/gate-result.json`
-/ `context.data.*`), `log`, and `preflight` all ship. The `mover` (transport) and `handling` (data-class
-tag + Object Lock retention) **interface seams** are defined; their live impls — `steward ingest` (drive
-a mover) and `apply-handling` (S3 Object Lock) — plus closeout/destruction are deferred follow-ons
-(retention/destruction are high-consequence and need live AWS). See `business/steward-product-spec.md`
-(in the umbrella) and provabl ADR 0004 for the full roadmap.
+**v1 complete + `ingest` shipping.** Provenance `record`/`verify`, the `data://` appraisal `gate`
+(→ `.steward/gate-result.json` / `context.data.*`), `log`, and `preflight` all ship. **`steward ingest`**
+now drives the authorize → move → record flow over the `mover` seam, with a config-driven authorizer
+and a local reference mover (so the full lifecycle runs with no AWS). Deferred behind their seams: the
+live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer; `apply-handling` (the `handling`
+seam: data-class tag + S3 Object Lock retention); and closeout/destruction (high-consequence, certify-
+and-confirm, needs live AWS). See `business/steward-product-spec.md` (in the umbrella) and provabl
+ADR 0004 for the full roadmap.
 
 ## License
 
