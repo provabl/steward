@@ -50,19 +50,27 @@ type iamSimAPI interface {
 
 // stewardRequiredActions are the AWS IAM actions steward needs. The provenance
 // record/gate/log flow is local (no AWS). The AWS-touching paths are:
-//   - `provenance verify` against an S3 destination → s3:GetObject (v1 verifies
-//     local paths; the S3 reader is the deferred AWS slice),
-//   - `apply-handling` (deferred — internal/handling Tagger seam) → s3:PutObjectTagging,
-//     s3:PutObjectRetention.
+//   - `provenance verify` against an S3 destination → s3:GetObject,
+//   - `ingest --authorizer iam` → iam:ListRoleTags (reads the principal's
+//     attest:nih-dua-ids tag),
+//   - `apply-handling` → s3:ListBucket, s3:GetObjectTagging/PutObjectTagging, and
+//     (with --retain-until) s3:GetObjectRetention/PutObjectRetention,
+//   - `closeout` → s3:ListBucket, s3:ListBucketVersions, s3:GetObjectRetention,
+//     s3:DeleteObject (delete every version + marker once retention has elapsed).
 //
 // iam:SimulatePrincipalPolicy + sts:GetCallerIdentity are included because this
 // preflight itself needs them. See docs/required-permissions.md.
 var stewardRequiredActions = []string{
 	"sts:GetCallerIdentity",
 	"iam:SimulatePrincipalPolicy",
+	"iam:ListRoleTags",
 	"s3:GetObject",
+	"s3:ListBucket",
+	"s3:GetObjectTagging",
 	"s3:PutObjectTagging",
+	"s3:GetObjectRetention",
 	"s3:PutObjectRetention",
+	"s3:DeleteObject",
 }
 
 // CheckCallerPermissions loads AWS config for the region and verifies the calling
