@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`steward apply-handling` + the `handling` Applier/Backend** (post-v1, spec §3): applies a data
+  class's storage controls to an ingested S3 destination — the `steward:data-class` object tag and,
+  with `--retain-until`, S3 Object Lock (COMPLIANCE mode) retention aligned to the DUA term. The
+  package separates the **governance logic** (the `Applier`, fully fake-tested) from the **live S3
+  calls** (the `Backend` seam). The Applier enforces the load-bearing invariant **handling may be
+  strengthened but never relaxed**: extending a retention is allowed, shortening or removing one is
+  refused — a DUA term cannot be weakened — and it reads the current state first, failing closed if it
+  can't. The S3 backend expands the prefix to its objects (Object Lock is per-object), tags + retains
+  each, and reports the *earliest* retention across the prefix as `Current` (so the no-relax check
+  compares against the least-protected object). Fully fake-tested (no-relax / remove-refused /
+  fail-closed / fresh-apply; the S3 backend's list+tag+retain + earliest-retention aggregation). Live-
+  validated against real S3 with Object Lock: the tag path through the binary, the COMPLIANCE
+  put/get-retention calls, and **defence in depth** — both the Applier *and* S3 itself refuse to
+  shorten an existing lock. Deferred: closeout/destruction (the lifecycle bookend).
+
 - **`steward ingest` + `internal/ingest`** (post-v1, spec §1): the authorized move-to-compute flow —
   **authorize → move → record**, fail-closed at every step. `internal/ingest.Ingester` composes an
   `Authorizer`, the `mover.Mover` seam (its first consumer — shipped interface-only in v1), and the

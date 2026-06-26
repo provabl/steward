@@ -108,14 +108,15 @@ go install github.com/provabl/steward/cmd/steward@latest   # requires Go 1.26.4+
 
 ## Status
 
-**v1 complete + `ingest` shipping.** Provenance `record`/`verify`, the `data://` appraisal `gate`
-(→ `.steward/gate-result.json` / `context.data.*`), `log`, and `preflight` all ship. **`steward ingest`**
-now drives the authorize → move → record flow over the `mover` seam, with a config-driven authorizer
-and a local reference mover (so the full lifecycle runs with no AWS). Deferred behind their seams: the
-live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer; `apply-handling` (the `handling`
-seam: data-class tag + S3 Object Lock retention); and closeout/destruction (high-consequence, certify-
-and-confirm, needs live AWS). See `business/steward-product-spec.md` (in the umbrella) and provabl
-ADR 0004 for the full roadmap.
+**v1 complete; `ingest` + `apply-handling` shipped.** Provenance `record`/`verify`, the `data://`
+appraisal `gate` (→ `.steward/gate-result.json` / `context.data.*`), `log`, and `preflight` ship.
+**`steward ingest`** drives authorize → move → record over the `mover` seam (config-driven authorizer +
+local reference mover — full lifecycle runs with no AWS). **`steward apply-handling`** tags an ingested
+S3 destination with its data class and applies S3 Object Lock retention for the DUA term, enforcing
+"handling may be strengthened but never relaxed" (live-validated against real S3 + Object Lock).
+Deferred behind their seams: the live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer;
+closeout/destruction (high-consequence, certify-and-confirm). See `business/steward-product-spec.md`
+(in the umbrella) and provabl ADR 0004 for the full roadmap.
 
 ## License
 
