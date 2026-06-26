@@ -9,9 +9,11 @@
 // Where vet qualifies the software that arrives at an SRE, steward qualifies the
 // data. See the suite spec (business/steward-product-spec.md) and ADR 0004.
 //
-// v1 scope: provenance record/verify, the data:// appraisal gate, audit log, and
-// preflight. Transport (the mover), S3 Object Lock handling, and closeout/
-// destruction are deferred — v1 governs data that was moved out-of-band.
+// Commands: ingest (authorize → move → record), provenance record/verify, the
+// data:// appraisal gate, audit log, and preflight. The live movers (Globus /
+// DataSync / s3cp), S3 Object Lock handling (apply-handling), and closeout/
+// destruction are deferred behind their seams; `ingest`'s v1 uses a config-driven
+// authorizer + a local reference mover, so the full lifecycle runs without AWS.
 package main
 
 import (
@@ -44,6 +46,6 @@ context.data.*. Where vet qualifies the software, steward qualifies the data.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	cmd.AddCommand(provenanceCmd(), gateCmd(), logCmd(), preflightCmd())
+	cmd.AddCommand(ingestCmd(), provenanceCmd(), gateCmd(), logCmd(), preflightCmd())
 	return cmd
 }
