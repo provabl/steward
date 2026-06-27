@@ -119,14 +119,17 @@ go install github.com/provabl/steward/cmd/steward@latest   # requires Go 1.26.4+
 
 **The full move-to-compute lifecycle ships:** `ingest` → `provenance verify` → `gate` →
 `apply-handling` → `closeout`, plus `log` and `preflight`. **`ingest`** drives authorize → move →
-record over the `mover` seam (config-driven authorizer + local reference mover — runs with no AWS).
+record: authorization is config-driven *or* reads the principal's `attest:nih-dua-ids` IAM tag
+(`--authorizer policy|iam`), and the transport is the local reference mover *or* a generic exec-based
+**command mover** (`--mover local|command`) that runs any scriptable transport — `aws s3 cp`,
+`globus transfer`, `rclone copy` — with zero steward coupling (see [docs/movers.md](docs/movers.md)).
 **`apply-handling`** tags an S3 destination with its data class and applies Object Lock retention for
 the DUA term, "strengthened but never relaxed." **`closeout`** destroys data at DUA end and emits a
 destruction certificate — *certify + confirm, never silent delete*: a dry run by default, refusing
 until any Object Lock retention has elapsed and requiring an explicit confirming principal
-(both apply-handling and closeout live-validated against real S3 + Object Lock). Deferred behind their
-seams: the live movers (Globus / DataSync / s3cp) and the IAM-tag authorizer. See
-`business/steward-product-spec.md` (in the umbrella) and provabl ADR 0004 for the full roadmap.
+(both apply-handling and closeout live-validated against real S3 + Object Lock). The only deferred
+work is **native SDK movers** (Globus/DataSync), added only if a transport needs features the command
+mover can't express. See `business/steward-product-spec.md` (in the umbrella) and provabl ADR 0004.
 
 ## License
 

@@ -12,10 +12,11 @@
 // Commands span the full move-to-compute lifecycle: ingest (authorize → move →
 // record), provenance record/verify, the data:// appraisal gate, apply-handling
 // (data-class tag + S3 Object Lock retention), closeout (certify + confirm
-// destruction at DUA end), audit log, and preflight. The live movers (Globus /
-// DataSync / s3cp) and the IAM-tag authorizer are deferred behind their seams;
-// ingest's v1 uses a config-driven authorizer + a local reference mover, so the
-// move→verify→gate lifecycle runs without AWS.
+// destruction at DUA end), audit log, and preflight. ingest's authorizer is
+// config-driven or reads attest:nih-dua-ids (--authorizer policy|iam); its mover
+// is the local reference mover or a generic exec-based command mover
+// (--mover local|command), so any scriptable transport plugs in — native SDK
+// movers (Globus/DataSync) are added only if a transport needs them (docs/movers.md).
 package main
 
 import (

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Added
 
+- **`mover.CommandMover` + `ingest --mover command` — the exec-based extensibility path** (post-v1):
+  a generic mover that runs an operator-configured command (`--mover-command "aws s3 cp {source} {dest}"`,
+  `"globus transfer {source} {dest}"`, `"rclone copy {source} {dest}"`, a wrapper script) to move the
+  bytes — so **any scriptable transport plugs in with zero steward coupling**, mirroring how vet shells
+  out to cosign/syft/grype rather than importing their SDKs. Two safety properties make a fully generic
+  mover sound: **no shell** (run as argv; `{source}`/`{dest}` substituted as whole arguments, so a
+  crafted path can't inject), and **zero trust in the transport** (steward records the digest as asserted
+  and `provenance verify` re-checks it; the command mover self-computes the sha256 of a local dest rather
+  than believe the command). `ingest --mover local|command` (default `local`). New `docs/movers.md`
+  records the pluggable-transport decision (refines ADR 0004). Fully fake-tested incl. an
+  argv-injection-safety test; native SDK movers (Globus/DataSync) remain deferred — added only if a
+  transport needs features the command path can't express.
+
 - **`ingest --authorizer iam` — authorize against real IAM tags** (post-v1): the production
   `ingest.Authorizer` that reads the requesting principal's `attest:nih-dua-ids` IAM role tag (the set
   qualify writes on approval, the same one the compute-to-data chain checks) and permits an ingestion
