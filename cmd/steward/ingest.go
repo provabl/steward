@@ -5,6 +5,8 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -20,6 +22,7 @@ func ingestCmd() *cobra.Command {
 		allowedDUAs, allowedSources  []string
 		requireDataClass, stewardDir string
 		authorizer, region           string
+		moverName, moverCommand      string
 	)
 	cmd := &cobra.Command{
 		Use:   "ingest",
@@ -40,8 +43,16 @@ Authorization (--authorizer):
           qualify writes on approval) and permits only if it contains --dua-id.
           --allowed-source / --require-data-class still apply. Needs iam:ListRoleTags.
 
-The only mover today is the local reference mover (local paths / file://); the
-live movers (Globus / DataSync / s3cp) are deferred behind the same seam.
+Mover (--mover):
+  local    the reference mover (default): copies a local path / file://, hashing
+           as it goes. No external transport.
+  command  run an operator-configured command (--mover-command) to move the bytes
+           — e.g. "aws s3 cp {source} {dest}", "globus transfer {source} {dest}",
+           "rclone copy {source} {dest}". {source}/{dest} are substituted as whole
+           arguments (no shell — injection-safe), and steward computes the digest
+           itself (zero-trust: it never believes the command about what it moved).
+  This is the extensibility path — any scriptable transport plugs in with no
+  steward coupling; native SDK movers are added only if a transport needs them.
 
 Example:
   steward ingest --dataset phs000178 \
@@ -70,7 +81,20 @@ Example:
 			default:
 				return fmt.Errorf("unknown --authorizer %q (want: policy, iam)", authorizer)
 			}
-			ing := ingest.New(auth, mover.NewLocalMover(), store.New(stewardDir))
+			var mv mover.Mover
+			switch moverName {
+			case "local", "":
+				mv = mover.NewLocalMover()
+			case "command":
+				m, err := mover.NewCommandMover(transportLabel(moverCommand), splitArgv(moverCommand))
+				if err != nil {
+					return err
+				}
+				mv = m
+			default:
+				return fmt.Errorf("unknown --mover %q (want: local, command)", moverName)
+			}
+			ing := ingest.New(auth, mv, store.New(stewardDir))
 			res, err := ing.Ingest(cmd.Context(), ingest.Request{
 				Dataset:   dataset,
 				Source:    source,
@@ -100,6 +124,26 @@ Example:
 	cmd.Flags().StringVar(&requireDataClass, "require-data-class", "", "require the request's data class to match this")
 	cmd.Flags().StringVar(&authorizer, "authorizer", "policy", "authorization source: policy (config-driven, default) or iam (reads attest:nih-dua-ids)")
 	cmd.Flags().StringVar(&region, "region", "us-east-1", "AWS region (for --authorizer iam)")
+	cmd.Flags().StringVar(&moverName, "mover", "local", "transport: local (default) or command")
+	cmd.Flags().StringVar(&moverCommand, "mover-command", "", `command template for --mover command, e.g. "aws s3 cp {source} {dest}"`)
 	cmd.Flags().StringVar(&stewardDir, "steward-dir", ".steward", "store directory")
 	return cmd
+}
+
+// splitArgv splits a command template into argv on whitespace. The template's
+// {source}/{dest} placeholders are substituted later as whole argv elements, so
+// splitting here is only structural (the operator writes the template); a value
+// with embedded spaces is not the template's concern — placeholders are single
+// tokens. (Operators needing a literal space in an argument should use a wrapper
+// script, the standard exec escape hatch.)
+func splitArgv(s string) []string { return strings.Fields(s) }
+
+// transportLabel derives the provenance Mechanism from the command's program name
+// (argv[0]'s base), e.g. "aws s3 cp …" → "aws". Falls back to "command".
+func transportLabel(s string) string {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return "command"
+	}
+	return filepath.Base(f[0])
 }
