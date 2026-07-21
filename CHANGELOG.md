@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ## [Unreleased]
 
+### Security
+
+- **Bump Go 1.26.4 → 1.26.5** to clear **GO-2026-5856** (a `crypto/tls` standard-library vulnerability, fixed in go1.26.5). govulncheck flagged it as symbol-reachable via steward's TLS calls (S3, HTTPS). Toolchain bump only — no code changes.
+
 ### Added
 
 - **`mover.CommandMover` + `ingest --mover command` — the exec-based extensibility path** (post-v1):
